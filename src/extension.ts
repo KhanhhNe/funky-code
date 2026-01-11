@@ -21,6 +21,12 @@ export function activate(context: vscode.ExtensionContext) {
                     "workbench.action.compareEditor.focusPrimarySide"
                 );
                 const { range, filePath, commit } = parseFromDiffContextLines();
+                if (!filePath || !commit) {
+                    vscode.window.showInformationMessage(
+                        "No file path or commit found in diff context."
+                    );
+                    return;
+                }
                 await showSelectionGitHistory(filePath!, {
                     range,
                     fromAfter: commit!,
@@ -34,6 +40,12 @@ export function activate(context: vscode.ExtensionContext) {
                     "workbench.action.compareEditor.focusSecondarySide"
                 );
                 const { range, filePath, commit } = parseFromDiffContextLines();
+                if (!filePath || !commit) {
+                    vscode.window.showInformationMessage(
+                        "No file path or commit found in diff context."
+                    );
+                    return;
+                }
                 await showSelectionGitHistory(filePath!, {
                     range,
                     toBefore: commit!,
@@ -44,7 +56,11 @@ export function activate(context: vscode.ExtensionContext) {
             "funky-code.showSelectionHistory",
             async () => {
                 const editor = vscode.window.activeTextEditor;
-                const selection = editor!.selection;
+                const selection = editor?.selection;
+                if (!editor || !selection || selection.isEmpty) {
+                    vscode.window.showInformationMessage("No selection found.");
+                    return;
+                }
                 const filePath = editor!.document.uri.fsPath;
                 const range = {
                     start: selection.start.line + 1,

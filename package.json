@@ -50,6 +50,20 @@
                     "command": "funky-code.showSelectionHistory",
                     "when": "editorTextFocus && editorHasSelection"
                 }
+            ],
+            "commandPalette": [
+                {
+                    "command": "funky-code.showSelectionHistory",
+                    "when": "activeEditor && editorHasSelection"
+                },
+                {
+                    "command": "funky-code.nextSelectionHistory",
+                    "when": "diffEditorModifiedUri =~ /.*\\/Temp\\/funky-code\\/.*/ && diffEditorOriginalUri =~ /.*\\/Temp\\/funky-code\\/.*/"
+                },
+                {
+                    "command": "funky-code.prevSelectionHistory",
+                    "when": "diffEditorModifiedUri =~ /.*\\/Temp\\/funky-code\\/.*/ && diffEditorOriginalUri =~ /.*\\/Temp\\/funky-code\\/.*/"
+                }
             ]
         }
     },
