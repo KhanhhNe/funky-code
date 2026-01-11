@@ -39,24 +39,25 @@ export function activate(context: vscode.ExtensionContext) {
                     toBefore: commit!,
                 });
             }
+        ),
+        vscode.commands.registerCommand(
+            "funky-code.showSelectionHistory",
+            async () => {
+                const editor = vscode.window.activeTextEditor;
+                const selection = editor!.selection;
+                const filePath = editor!.document.uri.fsPath;
+                const range = {
+                    start: selection.start.line + 1,
+                    end: selection.end.line + 1,
+                };
+                await showSelectionGitHistory(filePath, { range });
+            }
         )
     );
 
     // Create output channel
     outputChannel = vscode.window.createOutputChannel("Funky Code");
     context.subscriptions.push(outputChannel);
-
-    outputChannel.show();
-    vscode.commands.executeCommand("workbench.action.closeAllEditors");
-    showSelectionGitHistory(
-        `D:/Repos/PassiveMonCore/sources/dev/PassiveWebApp/src/PassiveWebApp/MdsConfigValidationTest/MdsConfigValidatorTest.cs`,
-        {
-            range: {
-                start: 27,
-                end: 53,
-            },
-        }
-    ).catch(logToFunkyCode);
 }
 
 function logToFunkyCode(...messages: any[]) {

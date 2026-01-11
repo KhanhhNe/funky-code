@@ -25,6 +25,11 @@
                 "command": "funky-code.prevSelectionHistory",
                 "title": "Show previous selection history",
                 "icon": "$(debug-step-back)"
+            },
+            {
+                "command": "funky-code.showSelectionHistory",
+                "title": "Show selection history",
+                "icon": "$(history)"
             }
         ],
         "menus": {
@@ -38,6 +43,12 @@
                     "command": "funky-code.nextSelectionHistory",
                     "when": "diffEditorModifiedUri =~ /.*\\/Temp\\/funky-code\\/.*/ && diffEditorOriginalUri =~ /.*\\/Temp\\/funky-code\\/.*/",
                     "group": "navigation@2"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "funky-code.showSelectionHistory",
+                    "when": "editorTextFocus && editorHasSelection"
                 }
             ]
         }
