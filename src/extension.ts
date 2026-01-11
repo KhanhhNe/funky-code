@@ -16,11 +16,29 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand(
             "funky-code.nextSelectionHistory",
-            () => {}
+            async () => {
+                await vscode.commands.executeCommand(
+                    "workbench.action.compareEditor.focusPrimarySide"
+                );
+                const { range, filePath, commit } = parseFromDiffContextLines();
+                await showSelectionGitHistory(filePath!, {
+                    range,
+                    fromAfter: commit!,
+                });
+            }
         ),
         vscode.commands.registerCommand(
             "funky-code.prevSelectionHistory",
-            () => {}
+            async () => {
+                await vscode.commands.executeCommand(
+                    "workbench.action.compareEditor.focusSecondarySide"
+                );
+                const { range, filePath, commit } = parseFromDiffContextLines();
+                await showSelectionGitHistory(filePath!, {
+                    range,
+                    toBefore: commit!,
+                });
+            }
         )
     );
 
@@ -32,10 +50,12 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand("workbench.action.closeAllEditors");
     showSelectionGitHistory(
         `D:/Repos/PassiveMonCore/sources/dev/PassiveWebApp/src/PassiveWebApp/MdsConfigValidationTest/MdsConfigValidatorTest.cs`,
-        new vscode.Range(
-            new vscode.Position(25, 0),
-            new vscode.Position(93, 10)
-        )
+        {
+            range: {
+                start: 27,
+                end: 53,
+            },
+        }
     ).catch(logToFunkyCode);
 }
 
@@ -47,18 +67,61 @@ function logToFunkyCode(...messages: any[]) {
     }
 }
 
-async function showSelectionGitHistory(filePath: string, range?: vscode.Range) {
+function parseFromDiffContextLines() {
+    const diffDoc = vscode.window.activeTextEditor!.document;
+    const diffText = diffDoc.getText();
+    const lines = diffText.split("\n");
+
+    const range = {
+        start: 6699,
+        end: 6699,
+    };
+    let filePath = null;
+    let commit = null;
+
+    for (const line of lines) {
+        if (line.startsWith("// file path: ")) {
+            filePath = line.substring("// file path: ".length).trim();
+        } else if (line.startsWith("// start line: ")) {
+            const startLine = parseInt(
+                line.substring("// start line: ".length).trim()
+            );
+            range.start = startLine;
+        } else if (line.startsWith("// end line: ")) {
+            const endLine = parseInt(
+                line.substring("// end line: ".length).trim()
+            );
+            range.end = endLine;
+        } else if (line.startsWith("// commit: ")) {
+            commit = line.substring("// commit: ".length).trim();
+        }
+    }
+
+    return {
+        filePath,
+        range,
+        commit,
+    };
+}
+
+async function showSelectionGitHistory(
+    filePath: string,
+    opts: {
+        range?: { start: number; end: number };
+        fromAfter?: string;
+        toBefore?: string;
+    }
+) {
+    logToFunkyCode(arguments);
+
     const change = await getFileChangeHistory(
         filePath,
-        undefined,
-        range
-            ? {
-                  start: range.start.line,
-                  end: range.end.line,
-              }
-            : undefined
+        opts.fromAfter,
+        opts.toBefore,
+        opts.range
     ).catch(logToFunkyCode);
-    logToFunkyCode("change:", change?.beforeRange);
+    const { before, after, ...rest } = change || {};
+    logToFunkyCode("change:", rest);
 
     if (!change) {
         vscode.window.showInformationMessage(
@@ -77,6 +140,7 @@ async function showSelectionGitHistory(filePath: string, range?: vscode.Range) {
     const afterUri = vscode.Uri.file(afterPath);
 
     const contextLines = [
+        `// file path: ${filePath}`,
         `// commit: ${change.commit}`,
         `// author: ${change.author}`,
         `// author email: ${change.authorEmail}`,
@@ -113,12 +177,14 @@ async function showSelectionGitHistory(filePath: string, range?: vscode.Range) {
 
 async function getFileChangeHistory(
     filePath: string,
-    excludeCommitFrom?: string,
+    fromAfterCommit?: string,
+    toBeforeCommit?: string,
     range?: { start: number; end: number }
 ) {
     const git = simpleGit(path.dirname(filePath));
     const basePath = await git.revparse(["--show-toplevel"]);
     const firstCommit = await git.firstCommit();
+    const direction = fromAfterCommit ? "newer" : "older";
 
     const relativePath = path
         .relative(basePath, filePath)
@@ -127,75 +193,107 @@ async function getFileChangeHistory(
     const allCommits = await git
         .log({
             file: filePath,
-            from: firstCommit,
-            to: excludeCommitFrom ? `${excludeCommitFrom}~1` : undefined,
+            from: fromAfterCommit ?? firstCommit,
+            to: toBeforeCommit ?? "HEAD",
         })
-        .then((r) => [...r.all]);
+        .then((r) =>
+            r.all.filter(
+                (c) => c.hash !== fromAfterCommit && c.hash !== toBeforeCommit
+            )
+        );
+
+    let changedRange = null;
 
     // Find until we find a commit that changes the given range
     while (allCommits.length > 0) {
-        const currentCommit = allCommits.shift()!;
+        const currentCommit =
+            direction === "older" ? allCommits.shift()! : allCommits.pop()!;
         const hash = currentCommit.hash;
         logToFunkyCode(`Checking commit: ${hash}`);
 
         // Get the file's content before and after the commit
         // Note that if this is the first commit, there is no "before" content since the file is added
-        const beforeContent =
-            allCommits.length > 0
-                ? await git.show([`${hash}~1:${relativePath}`])
-                : "";
-        const afterContent = await git.show([`${hash}:${relativePath}`]);
+        let changedContent = "";
+        let currentContent = "";
+        if (direction === "older") {
+            if (allCommits.length > 0) {
+                changedContent = await git.show([`${hash}~1:${relativePath}`]);
+            }
+            currentContent = await git.show([`${hash}:${relativePath}`]);
+        } else {
+            currentContent = await git.show([`${hash}~1:${relativePath}`]);
+            changedContent = await git.show([`${hash}:${relativePath}`]);
+        }
 
         if (!range) {
-            range = { start: 1, end: afterContent.split("\n").length };
+            range = { start: 1, end: currentContent.split("\n").length };
         }
-        const beforeRange = { ...range };
+        if (!changedRange) {
+            changedRange = { ...range };
+        }
 
         let currentLine = 1;
         let changed = false;
 
         // Compute the line range in the beforeContent that corresponds to the given range in afterContent
-        for (const diff of diffLines(afterContent, beforeContent)) {
+        for (const diff of diffLines(currentContent, changedContent)) {
             if (diff.added) {
-                if (currentLine < beforeRange.start) {
-                    beforeRange.start += diff.count;
-                    beforeRange.end += diff.count;
-                } else if (currentLine < beforeRange.end) {
+                if (currentLine < changedRange.start) {
+                    changedRange.start += diff.count;
+                    changedRange.end += diff.count;
+                } else if (currentLine <= changedRange.end) {
                     changed = true;
-                    beforeRange.end += diff.count;
+                    changedRange.end += diff.count;
                 }
             } else if (diff.removed) {
-                if (currentLine < beforeRange.start) {
-                    beforeRange.start -= diff.count;
-                    beforeRange.end -= diff.count;
-                } else if (currentLine < beforeRange.end) {
+                if (currentLine < changedRange.start) {
+                    changedRange.start -= diff.count;
+                    changedRange.end -= diff.count;
+                } else if (currentLine < changedRange.end) {
                     changed = true;
-                    beforeRange.end -= Math.min(
-                        diff.count,
-                        beforeRange.end - currentLine
+                    changedRange.end = Math.max(
+                        changedRange.end - diff.count,
+                        currentLine
                     );
                 }
             }
+            // logToFunkyCode({
+            //     currentLine,
+            //     range,
+            //     beforeRange,
+            //     diff: {
+            //         mod: diff.added
+            //             ? "added"
+            //             : diff.removed
+            //             ? "removed"
+            //             : "unchanged",
+            //         count: diff.count,
+            //     },
+            // });
 
-            currentLine += diff.count;
+            if (!diff.removed) {
+                currentLine += diff.count;
+            }
         }
 
         if (changed) {
             return {
                 before: sliceLine(
-                    beforeContent,
-                    beforeRange.start - 1,
-                    beforeRange.end
+                    changedContent,
+                    changedRange.start - 1,
+                    changedRange.end
                 ),
-                after: sliceLine(afterContent, range.start - 1, range.end),
-                beforeRange: beforeRange,
-                afterRange: range,
+                beforeRange: direction === "older" ? changedRange : range,
+                after: sliceLine(currentContent, range.start - 1, range.end),
+                afterRange: direction === "older" ? range : changedRange,
                 commit: currentCommit.hash,
                 author: currentCommit.author_name,
                 authorEmail: currentCommit.author_email,
             };
         }
     }
+
+    return null;
 }
 
 function sliceLine(text: string, start?: number, end?: number) {
