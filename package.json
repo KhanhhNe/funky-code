@@ -1,0 +1,70 @@
+{
+    "name": "funky-code",
+    "displayName": "Funky Code",
+    "publisher": "KhanhhNe",
+    "description": "",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.108.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "funky-code.nextSelectionHistory",
+                "title": "Show next selection history",
+                "icon": "$(debug-step-over)"
+            },
+            {
+                "command": "funky-code.prevSelectionHistory",
+                "title": "Show previous selection history",
+                "icon": "$(debug-step-back)"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "funky-code.prevSelectionHistory",
+                    "when": "diffEditorModifiedUri =~ /.*\\/Temp\\/funky-code\\/.*/ && diffEditorOriginalUri =~ /.*\\/Temp\\/funky-code\\/.*/",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "funky-code.nextSelectionHistory",
+                    "when": "diffEditorModifiedUri =~ /.*\\/Temp\\/funky-code\\/.*/ && diffEditorOriginalUri =~ /.*\\/Temp\\/funky-code\\/.*/",
+                    "group": "navigation@2"
+                }
+            ]
+        }
+    },
+    "enabledApiProposals": [
+        "contribEditorContentMenu"
+    ],
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "22.x",
+        "@types/vscode": "^1.108.1",
+        "@vscode/test-cli": "^0.0.12",
+        "@vscode/test-electron": "^2.5.2",
+        "eslint": "^9.39.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.52.0"
+    },
+    "dependencies": {
+        "diff": "^8.0.2",
+        "simple-git": "^3.30.0"
+    }
+}
