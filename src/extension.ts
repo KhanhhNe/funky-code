@@ -152,6 +152,25 @@ async function showSelectionGitHistory(
         toBefore?: string;
     },
 ) {
+    vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: "Loading git history...",
+        },
+        async () => {
+            await _showSelectionGitHistory(filePath, opts);
+        },
+    );
+}
+
+async function _showSelectionGitHistory(
+    filePath: string,
+    opts: {
+        range?: { start: number; end: number };
+        fromAfter?: string;
+        toBefore?: string;
+    },
+) {
     logToFunkyCode(arguments);
 
     const change = await getFileChangeHistory(
