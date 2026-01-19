@@ -76,13 +76,13 @@ export function activate(context: vscode.ExtensionContext) {
                 const originalContent = await git.show([`HEAD:${relPath}`]);
 
                 const rangeInfo = calculateCorrespondingRange({
-                    currentContent,
-                    range,
-                    changedContent: originalContent,
+                    oldContent: currentContent,
+                    oldRange: range,
+                    newContent: originalContent,
                 });
 
                 await showSelectionGitHistory(filePath, {
-                    range: rangeInfo.changedRange,
+                    range: rangeInfo.newRange,
                 });
             },
         ),
@@ -242,7 +242,7 @@ async function getFileChangeHistory(
             ),
         );
 
-    let changedRange = null;
+    let newRange = null;
 
     // Find until we find a commit that changes the given range
     while (allCommits.length > 0) {
@@ -266,19 +266,19 @@ async function getFileChangeHistory(
         }
 
         const rangeInfo = calculateCorrespondingRange({
-            currentContent,
-            range,
-            changedContent,
+            oldContent: currentContent,
+            oldRange: range,
+            newContent: changedContent,
         });
-        range = rangeInfo.currentRange;
-        changedRange = rangeInfo.changedRange;
+        range = rangeInfo.oldRange;
+        newRange = rangeInfo.newRange;
 
         if (rangeInfo.rangeChanged) {
             return {
-                before: rangeInfo.currentText,
-                beforeRange: direction === "older" ? changedRange : range,
-                after: rangeInfo.changedText,
-                afterRange: direction === "older" ? range : changedRange,
+                before: rangeInfo.oldContent,
+                beforeRange: direction === "older" ? newRange : range,
+                after: rangeInfo.newContent,
+                afterRange: direction === "older" ? range : newRange,
                 commit: currentCommit.hash,
                 author: currentCommit.author_name,
                 authorEmail: currentCommit.author_email,
@@ -290,45 +290,42 @@ async function getFileChangeHistory(
 }
 
 function calculateCorrespondingRange({
-    currentContent,
-    range,
-    changedContent,
+    oldContent,
+    oldRange,
+    newContent,
 }: {
-    currentContent: string;
-    range?: Range;
-    changedContent: string;
+    oldContent: string;
+    oldRange?: Range;
+    newContent: string;
 }) {
-    currentContent = currentContent.replaceAll("\r\n", "\n");
-    changedContent = changedContent.replaceAll("\r\n", "\n");
+    oldContent = oldContent.replaceAll("\r\n", "\n");
+    newContent = newContent.replaceAll("\r\n", "\n");
 
-    if (!range) {
-        range = { start: 1, end: currentContent.split("\n").length };
+    if (!oldRange) {
+        oldRange = { start: 1, end: oldContent.split("\n").length };
     }
-    const changedRange = { ...range };
+    const newRange = { ...oldRange };
 
     let currentLine = 1;
     let changed = false;
 
     // Compute the line range in the beforeContent that corresponds to the given range in afterContent
-    for (const diff of diffLines(currentContent, changedContent)) {
+    for (const diff of diffLines(oldContent, newContent)) {
         if (diff.added) {
-            if (currentLine < changedRange.start) {
-                changedRange.start += diff.count;
-                changedRange.end += diff.count;
-            } else if (currentLine <= changedRange.end) {
+            if (currentLine < newRange.start) {
+                newRange.start += diff.count;
+                newRange.end += diff.count;
+            } else if (currentLine <= newRange.end) {
                 changed = true;
-                changedRange.end += diff.count;
+                newRange.end += diff.count;
             }
         } else if (diff.removed) {
-            if (currentLine < changedRange.start) {
-                changedRange.start -= diff.count;
-                changedRange.end -= diff.count;
-            } else if (currentLine < changedRange.end) {
+            if (currentLine < newRange.start) {
+                newRange.start -= diff.count;
+                newRange.end -= diff.count;
+            } else if (currentLine < newRange.end) {
                 changed = true;
-                changedRange.end = Math.max(
-                    changedRange.end - diff.count,
-                    currentLine,
-                );
+                newRange.end = Math.max(newRange.end - diff.count, currentLine);
             }
         }
 
@@ -338,14 +335,10 @@ function calculateCorrespondingRange({
     }
 
     return {
-        currentText: sliceLine(currentContent, range.start - 1, range.end),
-        currentRange: range,
-        changedText: sliceLine(
-            changedContent,
-            changedRange.start - 1,
-            changedRange.end,
-        ),
-        changedRange,
+        oldContent: sliceLine(oldContent, oldRange.start - 1, oldRange.end),
+        oldRange: oldRange,
+        newContent: sliceLine(newContent, newRange.start - 1, newRange.end),
+        newRange,
         rangeChanged: changed,
     };
 }
