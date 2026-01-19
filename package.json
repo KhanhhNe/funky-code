@@ -14,9 +14,7 @@
     "categories": [
         "Other"
     ],
-    "activationEvents": [
-        "*"
-    ],
+    "activationEvents": [],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
@@ -34,6 +32,11 @@
                 "command": "funky-code.showSelectionHistory",
                 "title": "Show selection history",
                 "icon": "$(history)"
+            },
+            {
+                "command": "funky-code.showFunkyCodeOutput",
+                "title": "Show Funky Code Output",
+                "icon": "$(output)"
             }
         ],
         "menus": {
